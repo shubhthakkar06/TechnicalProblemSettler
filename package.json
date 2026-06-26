@@ -1,0 +1,25 @@
+{
+  "name": "problem-settler",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev & cd backend && python3.11 -m venv venv && source venv/bin/activate && pip install -r requirements.txt && uvicorn main:app --reload --port 8000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@google/genai": "^2.9.0",
+    "html2pdf.js": "^0.14.0",
+    "jszip": "^3.10.1",
+    "lucide-react": "^1.21.0",
+    "markdown-it": "^14.2.0",
+    "next": "16.2.9",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "eslint": "^9",
+    "eslint-config-next": "16.2.9"
+  }
+}
