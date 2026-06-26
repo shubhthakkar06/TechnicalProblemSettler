@@ -1,2 +1,12 @@
+[project]
+name = "problem-settler"
+version = "0.1.0"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "google-antigravity",
+    "pydantic"
+]
+
 [tool.vercel]
 entrypoint = "backend.main:app"
