@@ -1,4 +1,4 @@
 fastapi
 uvicorn
-google-antigravity
+google-genai
 pydantic
