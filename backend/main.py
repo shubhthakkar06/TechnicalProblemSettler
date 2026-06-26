@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
-from google.antigravity import Agent, LocalAgentConfig
+from google import genai
 
 app = FastAPI()
 
@@ -26,28 +26,24 @@ class ChatRequest(BaseModel):
     problemData: dict
     apiKey: str
 
-def get_agent_config(api_key: str, role: str):
-    os.environ["GEMINI_API_KEY"] = api_key
+def get_system_instruction(role: str):
     if role == "generator":
-        system_instruction = """
+        return """
         You are an expert Problem Setter for programming competitions. 
         Generate a rigorous problem statement. 
         Format your output as JSON with two keys:
         - "title": A catchy, professional title.
         - "markdown": The problem statement in markdown (Description, Input/Output format, Constraints, Example Test Cases).
         """
-        return LocalAgentConfig(api_key=api_key, system_instructions=system_instruction, model="gemini-2.5-flash")
     elif role == "refiner":
-        system_instruction = """
+        return """
         You are an expert Problem Refiner. The user will ask you to modify an existing problem.
         First, write a short conversational response to the user.
         Then, on a new line, output EXACTLY the string '---UPDATE---'
         Then, output the updated problem as JSON with two keys: "title" and "markdown".
         Ensure the modifications are applied accurately to the markdown.
         """
-        return LocalAgentConfig(api_key=api_key, system_instructions=system_instruction, model="gemini-2.5-flash")
-    
-    return LocalAgentConfig(api_key=api_key)
+    return ""
 
 from fastapi.responses import StreamingResponse
 
@@ -56,15 +52,20 @@ async def generate_problem(req: GenerateRequest):
     if not req.apiKey:
         raise HTTPException(status_code=400, detail="API Key required")
     
-    config = get_agent_config(req.apiKey, "generator")
+    sys_inst = get_system_instruction("generator")
     prompt = f"Create a problem for the category '{req.category}' on the topic '{req.topic}' with difficulty '{req.difficulty}'. Return JSON."
     
     async def generate_stream():
         try:
-            async with Agent(config=config) as agent:
-                response = await agent.chat(prompt)
-                async for token in response:
-                    yield token
+            client = genai.Client(api_key=req.apiKey)
+            response = client.models.generate_content_stream(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config={"system_instruction": sys_inst}
+            )
+            for chunk in response:
+                if chunk.text:
+                    yield chunk.text
         except Exception as e:
             error_str = str(e)
             if "503" in error_str and "high demand" in error_str:
@@ -83,17 +84,22 @@ async def chat_with_agent(req: ChatRequest):
     if not req.apiKey:
         raise HTTPException(status_code=400, detail="API Key required")
         
-    config = get_agent_config(req.apiKey, "refiner")
+    sys_inst = get_system_instruction("refiner")
     
     current_state = f"Current Title: {req.problemData.get('title')}\n\nCurrent Markdown:\n{req.problemData.get('markdown')}"
     prompt = f"{current_state}\n\nUser Request: {req.message}\nRefine the problem. Return JSON."
     
     async def chat_stream():
         try:
-             async with Agent(config=config) as agent:
-                response = await agent.chat(prompt)
-                async for token in response:
-                    yield token
+            client = genai.Client(api_key=req.apiKey)
+            response = client.models.generate_content_stream(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config={"system_instruction": sys_inst}
+            )
+            for chunk in response:
+                if chunk.text:
+                    yield chunk.text
         except Exception as e:
             error_str = str(e)
             if "503" in error_str and "high demand" in error_str:
